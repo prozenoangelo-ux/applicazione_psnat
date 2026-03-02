@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:applicazione_psnat/widgets/global_menu_button.dart';
 import 'package:applicazione_psnat/widgets/multitagselector.dart';
 import 'package:applicazione_psnat/widgets/tagselector.dart';
+import 'package:applicazione_psnat/detail/edit/newsite.dart';
 
 class NewItemPage extends StatefulWidget {
   final Map<String, dynamic> box;
@@ -16,6 +17,38 @@ class NewItemPage extends StatefulWidget {
   State<NewItemPage> createState() => _NewItemPageState();
 }
 
+// 🔵 DROPDOWN SITI
+class SearchableDropdown extends StatelessWidget {
+  final List<Map<String, dynamic>> items;
+  final String? selectedId;
+  final Function(String?) onChanged;
+
+  const SearchableDropdown({
+    super.key,
+    required this.items,
+    required this.selectedId,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<String>(
+      initialValue: selectedId,
+      decoration: const InputDecoration(
+        border: OutlineInputBorder(),
+        labelText: "Sito archeologico",
+      ),
+      items: items.map((site) {
+        return DropdownMenuItem<String>(
+          value: site["siteId"] as String,
+          child: Text(site["nome"] as String),
+        );
+      }).toList(),
+      onChanged: onChanged,
+    );
+  }
+}
+
 class _NewItemPageState extends State<NewItemPage> {
   final nomeController = TextEditingController();
   final descrizioneController = TextEditingController();
@@ -23,108 +56,62 @@ class _NewItemPageState extends State<NewItemPage> {
 
   DateTime createdAt = DateTime.now();
 
+  // 🔵 SITI
+  String? selectedSiteId;
+  List<Map<String, dynamic>> sites = [];
+
   // 🔥 Nuove categorie
-  List<String> materiale=[];
+  List<String> materiale = [];
   String? stato;
   List<String> condizioni = [];
   String? tipologia;
-  List<String> periodo=[];
+  List<String> periodo = [];
   String? provenienza;
   String? tecnica;
 
   // 🔥 Liste valori
   final List<String> materiali = [
-    "Ceramica",
-    "Terracotta",
-    "Metallo",
-    "Bronzo",
-    "Ferro",
-    "Piombo",
-    "Oro",
-    "Argento",
-    "Vetro",
-    "Pietra",
-    "Marmo",
-    "Ossa",
-    "Legno",
-    "Tessuto",
-    "Avorio",
+    "Ceramica", "Terracotta", "Metallo", "Bronzo", "Ferro", "Piombo",
+    "Oro", "Argento", "Vetro", "Pietra", "Marmo", "Ossa",
+    "Legno", "Tessuto", "Avorio",
   ];
 
   List<String> statiReperto = [
-    "In lavorazione",
-    "Da pulire",
-    "Da catalogare",
-    "Pulito e catalogato",
-    "Stoccato",
+    "In lavorazione", "Da pulire", "Da catalogare",
+    "Pulito e catalogato", "Stoccato",
   ];
 
   List<String> condizioniReperto = [
-    "Ottime",
-    "Buone",
-    "Discrete",
-    "Scarse",
-    "Frammentato",
-    "Ricostruito",
-    "Erosione",
-    "Corrosione",
-    "Incrinato",
-    "Rotto",
-    "Completo",
-    "Parziale",
+    "Ottime", "Buone", "Discrete", "Scarse", "Frammentato", "Ricostruito",
+    "Erosione", "Corrosione", "Incrinato", "Rotto", "Completo", "Parziale",
   ];
 
   List<String> tipologie = [
-    "Anfora",
-    "Vaso",
-    "Coppa",
-    "Piatto",
-    "Lucerna",
-    "Statua",
-    "Moneta",
-    "Fibula",
-    "Utensile",
-    "Arma",
-    "Ornamento",
-    "Frammento",
+    "Anfora", "Vaso", "Coppa", "Piatto", "Lucerna", "Statua",
+    "Moneta", "Fibula", "Utensile", "Arma", "Ornamento", "Frammento",
   ];
 
   List<String> periodi = [
-    "Preistorico",
-    "Protostorico",
-    "Età del Bronzo",
-    "Età del Ferro",
-    "Periodo Greco",
-    "Periodo Romano",
-    "Tardoantico",
-    "Medievale",
-    "Rinascimentale",
+    "Preistorico", "Protostorico", "Età del Bronzo", "Età del Ferro",
+    "Periodo Greco", "Periodo Romano", "Tardoantico",
+    "Medievale", "Rinascimentale",
   ];
 
   List<String> provenienze = [
-    "Scavo",
-    "Superficie",
-    "Deposito",
-    "Collezione",
-    "Rinvenimento casuale",
-    "Donazione",
+    "Scavo", "Superficie", "Deposito", "Collezione",
+    "Rinvenimento casuale", "Donazione",
   ];
 
   List<String> tecniche = [
-    "Tornitura",
-    "Fusione",
-    "Forgiatura",
-    "Stampo",
-    "Intaglio",
-    "Incisione",
-    "Decorazione dipinta",
-    "Smaltatura",
+    "Tornitura", "Fusione", "Forgiatura", "Stampo",
+    "Intaglio", "Incisione", "Decorazione dipinta", "Smaltatura",
   ];
 
   @override
   void initState() {
     super.initState();
     stato = statiReperto.first;
+    _loadSites(); // 🔥 carica i siti
   }
 
   Future<String> _localPath() async {
@@ -135,6 +122,20 @@ class _NewItemPageState extends State<NewItemPage> {
   Future<File> _localFile() async {
     final path = await _localPath();
     return File('$path/database.json');
+  }
+
+  // 🔵 CARICA I SITI DAL DATABASE
+  Future<void> _loadSites() async {
+    final file = await _localFile();
+    final content = await file.readAsString();
+    List<dynamic> data = jsonDecode(content);
+
+    Map<String, dynamic> root = data.first;
+    sites = (root["sites"] as List<dynamic>? ?? [])
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
+
+    setState(() {});
   }
 
   Future<void> pickImages() async {
@@ -168,7 +169,6 @@ class _NewItemPageState extends State<NewItemPage> {
       "createdAt": createdAt.toIso8601String(),
       "updatedAt": createdAt.toIso8601String(),
 
-      // 🔥 Nuove categorie salvate nel JSON
       "materiale": materiale,
       "stato": stato,
       "condizioni": condizioni,
@@ -176,6 +176,8 @@ class _NewItemPageState extends State<NewItemPage> {
       "periodo": periodo,
       "provenienza": provenienza,
       "tecnica": tecnica,
+
+      "siteId": selectedSiteId, // 🔥 SALVATO
     };
 
     widget.box["items"] ??= [];
@@ -213,10 +215,8 @@ class _NewItemPageState extends State<NewItemPage> {
             Text("Data creazione: ${createdAt.toLocal()}"),
             const SizedBox(height: 20),
 
-            const Text(
-              "Nome",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            const Text("Nome",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
             TextField(
               controller: nomeController,
@@ -228,10 +228,8 @@ class _NewItemPageState extends State<NewItemPage> {
 
             const SizedBox(height: 20),
 
-            const Text(
-              "Descrizione",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            const Text("Descrizione",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
             TextField(
               controller: descrizioneController,
@@ -245,8 +243,32 @@ class _NewItemPageState extends State<NewItemPage> {
 
             const SizedBox(height: 20),
 
+            // 🔵 DROPDOWN SITI
+            SearchableDropdown(
+              items: sites,
+              selectedId: selectedSiteId,
+              onChanged: (v) => setState(() => selectedSiteId = v),
+            ),
 
+            TextButton.icon(
+              onPressed: () async {
+                final nuovoSito = await Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const NewSitePage()),
+                );
 
+                if (nuovoSito != null) {
+                  await _loadSites();
+                  setState(() {
+                    selectedSiteId = nuovoSito["siteId"];
+                  });
+                }
+              },
+              icon: const Icon(Icons.add_location_alt),
+              label: const Text("Aggiungi nuovo sito"),
+            ),
+
+            const SizedBox(height: 20),
 
             MultiTagSelector(
               label: "Condizioni",

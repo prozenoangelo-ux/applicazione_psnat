@@ -19,16 +19,39 @@ class DetailBoxPage extends StatefulWidget {
 class _DetailBoxPageState extends State<DetailBoxPage> {
   late Map<String, dynamic> box;
 
-  final GlobalKey qrKey = GlobalKey(); // 🔥 KEY PER SALVARE IL QR
+  final GlobalKey qrKey = GlobalKey();
 
-  Widget _tagChip(dynamic value) {
+  // 🔥 Normalizza qualsiasi valore in una lista di stringhe
+  List<String> _normalize(dynamic value) {
+    if (value == null) return [];
+    if (value is String) return [value];
+    if (value is List) return value.map((e) => e.toString()).toList();
+    return [];
+  }
+
+  // 🔥 Chip stile ItemDetailPage
+  Widget _tagChip(String value) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.blue.shade100,
         borderRadius: BorderRadius.circular(20),
       ),
-      child: Text(value.toString(), style: const TextStyle(fontSize: 16)),
+      child: Text(value, style: const TextStyle(fontSize: 16)),
+    );
+  }
+
+  // 🔥 Lista di chip
+  Widget _tagListBox(List<String> tags) {
+    if (tags.isEmpty) {
+      return const Text("Nessun tag",
+          style: TextStyle(fontSize: 16, color: Colors.grey));
+    }
+
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: tags.map((t) => _tagChip(t)).toList(),
     );
   }
 
@@ -50,32 +73,24 @@ class _DetailBoxPageState extends State<DetailBoxPage> {
         "${dt.minute.toString().padLeft(2, '0')}";
   }
 
+  // 🔥 Raccoglie TUTTI i tag reali degli item
   List<String> _collectTags() {
-  final items = (box["items"] as List<dynamic>? ?? []);
-  final Set<String> tags = {};
+    final items = (box["items"] as List<dynamic>? ?? []);
+    final Set<String> tags = {};
 
-  for (var it in items) {
-    // Liste
-    for (var m in (it["materiale"] as List<dynamic>? ?? [])) {
-      tags.add(m.toString());
-    }
-    for (var c in (it["condizioni"] as List<dynamic>? ?? [])) {
-      tags.add(c.toString());
-    }
-    for (var p in (it["periodo"] as List<dynamic>? ?? [])) {
-      tags.add(p.toString());
+    for (var it in items) {
+      tags.addAll(_normalize(it["materiale"]));
+      tags.addAll(_normalize(it["condizioni"]));
+      tags.addAll(_normalize(it["periodo"]));
+
+      if (it["stato"] != null) tags.add(it["stato"].toString());
+      if (it["tipologia"] != null) tags.add(it["tipologia"].toString());
+      if (it["provenienza"] != null) tags.add(it["provenienza"].toString());
+      if (it["tecnica"] != null) tags.add(it["tecnica"].toString());
     }
 
-    // Valori singoli
-    if (it["stato"] != null) tags.add(it["stato"]);
-    if (it["tipologia"] != null) tags.add(it["tipologia"]);
-    if (it["provenienza"] != null) tags.add(it["provenienza"]);
-    if (it["tecnica"] != null) tags.add(it["tecnica"]);
+    return tags.toList();
   }
-
-  return tags.toList();
-}
-
 
   List<String> _collectStates() {
     final items = (box["items"] as List<dynamic>? ?? []);
@@ -147,7 +162,7 @@ class _DetailBoxPageState extends State<DetailBoxPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 🔥 QR CODE CLICCABILE + ID
+            // QR
             Center(
               child: GestureDetector(
                 onTap: () => saveQrToGallery(qrKey, box["boxId"], context),
@@ -174,28 +189,22 @@ class _DetailBoxPageState extends State<DetailBoxPage> {
 
             const SizedBox(height: 24),
 
-            const Text(
-              "Titolo",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            const Text("Titolo",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
             _infoBox(box["titolo"] ?? ""),
 
             const SizedBox(height: 24),
 
-            const Text(
-              "Descrizione",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            const Text("Descrizione",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
             _infoBox(box["descrizione"] ?? ""),
 
             const SizedBox(height: 24),
 
-            const Text(
-              "Informazioni cronologiche",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            const Text("Informazioni cronologiche",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
 
             _infoBox(
@@ -205,18 +214,10 @@ class _DetailBoxPageState extends State<DetailBoxPage> {
 
             const SizedBox(height: 24),
 
-            const Text(
-              "Informazioni Box",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            const Text("Tag presenti",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
-
-            const Text(
-              "Tag presenti",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 6),
-            _tagChip(tags),
+            _tagListBox(tags),
 
             const SizedBox(height: 24),
 
@@ -227,17 +228,13 @@ class _DetailBoxPageState extends State<DetailBoxPage> {
 
             const SizedBox(height: 30),
 
-            const Text(
-              "Items nella Box",
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
+            const Text("Items nella Box",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),
 
             if (items.isEmpty)
-              const Text(
-                "Nessun item presente",
-                style: TextStyle(fontSize: 16, color: Colors.grey),
-              )
+              const Text("Nessun item presente",
+                  style: TextStyle(fontSize: 16, color: Colors.grey))
             else
               Column(
                 children: items.map((it) {
@@ -253,8 +250,7 @@ class _DetailBoxPageState extends State<DetailBoxPage> {
                       if (result == "deleted") {
                         setState(() {
                           box["items"].removeWhere(
-                            (x) => x["itemId"] == it["itemId"],
-                          );
+                              (x) => x["itemId"] == it["itemId"]);
                         });
                         return;
                       }
@@ -262,8 +258,7 @@ class _DetailBoxPageState extends State<DetailBoxPage> {
                       if (result != null) {
                         setState(() {
                           final index = box["items"].indexWhere(
-                            (x) => x["itemId"] == result["itemId"],
-                          );
+                              (x) => x["itemId"] == result["itemId"]);
                           if (index != -1) {
                             box["items"][index] = result;
                           }
@@ -291,8 +286,7 @@ class _DetailBoxPageState extends State<DetailBoxPage> {
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(12),
                               color: Colors.grey.shade200,
-                              image:
-                                  (it["foto"] != null &&
+                              image: (it["foto"] != null &&
                                       it["foto"] is List &&
                                       it["foto"].isNotEmpty)
                                   ? DecorationImage(
@@ -312,20 +306,15 @@ class _DetailBoxPageState extends State<DetailBoxPage> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text(
-                                  it["nome"] ?? "Senza nome",
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                                Text(it["nome"] ?? "Senza nome",
+                                    style: const TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold)),
                                 const SizedBox(height: 4),
-                                Text(
-                                  it["descrizione"] ?? "",
-                                  maxLines: 2,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 14),
-                                ),
+                                Text(it["descrizione"] ?? "",
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(fontSize: 14)),
                                 const SizedBox(height: 6),
                               ],
                             ),
