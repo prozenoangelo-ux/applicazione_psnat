@@ -1,7 +1,6 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
+import 'package:applicazione_psnat/auth/user_manager.dart';
+import 'package:applicazione_psnat/detail/database_manager.dart';
 
 class NewSitePage extends StatefulWidget {
   const NewSitePage({super.key});
@@ -15,16 +14,6 @@ class _NewSitePageState extends State<NewSitePage> {
   final descrizioneController = TextEditingController();
   final posizioneController = TextEditingController();
   final noteController = TextEditingController();
-
-  Future<String> _localPath() async {
-    final directory = await getApplicationDocumentsDirectory();
-    return directory.path;
-  }
-
-  Future<File> _localFile() async {
-    final path = await _localPath();
-    return File('$path/database.json');
-  }
 
   Future<void> saveSite() async {
     final nome = nomeController.text.trim();
@@ -42,25 +31,35 @@ class _NewSitePageState extends State<NewSitePage> {
       return;
     }
 
+    // 🔥 Utente corrente
+    final user = UserManager.currentUser();
+    if (user == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text("Errore: nessun utente loggato"),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    final newSiteId = DateTime.now().millisecondsSinceEpoch.toString();
+
     final newSite = {
-      "siteId": DateTime.now().millisecondsSinceEpoch.toString(),
+      "siteId": newSiteId,
       "nome": nome,
       "descrizione": descrizione,
       "posizione": posizione,
       "note": note,
+      "ownerId": user["userId"],
       "createdAt": DateTime.now().toIso8601String(),
     };
 
-    final file = await _localFile();
-    final content = await file.readAsString();
-    List<dynamic> data = jsonDecode(content);
+    // 🔥 Salva nel database
+    await DatabaseManager.addSite(newSite);
 
-    // Sezione "sites" nel database
-    Map<String, dynamic> root = data.first;
-    root["sites"] ??= [];
-    root["sites"].add(newSite);
-
-    await file.writeAsString(const JsonEncoder.withIndent('  ').convert(data));
+    // 🔥 Assegna permesso al creatore
+    await UserManager.addPermission(user["userId"], newSiteId);
 
     if (!mounted) return;
     Navigator.pop(context, newSite);

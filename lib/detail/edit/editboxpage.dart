@@ -1,10 +1,9 @@
 import 'dart:io';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:applicazione_psnat/widgets/global_menu_button.dart';
+import 'package:applicazione_psnat/detail/database_manager.dart';
 
 class EditBoxPage extends StatefulWidget {
   final Map<String, dynamic> box;
@@ -18,7 +17,6 @@ class EditBoxPage extends StatefulWidget {
 class _EditBoxPageState extends State<EditBoxPage> {
   late TextEditingController descrizioneController;
   late List<File> immagini;
-
   String? stato;
 
   @override
@@ -35,16 +33,6 @@ class _EditBoxPageState extends State<EditBoxPage> {
     stato = widget.box["stato"] ?? "In lavorazione";
   }
 
-  Future<String> _localPath() async {
-    final directory = await getApplicationDocumentsDirectory();
-    return directory.path;
-  }
-
-  Future<File> _localFile() async {
-    final path = await _localPath();
-    return File('$path/database.json');
-  }
-
   Future<void> pickImages() async {
     final picker = ImagePicker();
     final List<XFile> files = await picker.pickMultiImage();
@@ -58,20 +46,9 @@ class _EditBoxPageState extends State<EditBoxPage> {
     widget.box["descrizione"] = descrizioneController.text.trim();
     widget.box["foto"] = immagini.map((f) => f.path).toList();
     widget.box["stato"] = stato;
-
-    // 🔥 aggiorna la data di ultima modifica
     widget.box["updatedAt"] = DateTime.now().toIso8601String();
 
-    final file = await _localFile();
-    final content = await file.readAsString();
-    List<dynamic> data = jsonDecode(content);
-
-    final index = data.indexWhere((b) => b["boxId"] == widget.box["boxId"]);
-    if (index != -1) {
-      data[index] = widget.box;
-    }
-
-    await file.writeAsString(const JsonEncoder.withIndent('  ').convert(data));
+    await DatabaseManager.updateBox(widget.box);
 
     if (!mounted) return;
     Navigator.pop(context, widget.box);
@@ -83,7 +60,9 @@ class _EditBoxPageState extends State<EditBoxPage> {
       builder: (context) {
         return AlertDialog(
           title: const Text("Eliminare questa box?"),
-          content: const Text("Questa azione eliminerà anche tutti gli item contenuti."),
+          content: const Text(
+            "Questa azione eliminerà anche tutti gli item contenuti.",
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
@@ -100,13 +79,7 @@ class _EditBoxPageState extends State<EditBoxPage> {
 
     if (confirm != true) return;
 
-    final file = await _localFile();
-    final content = await file.readAsString();
-    List<dynamic> data = jsonDecode(content);
-
-    data.removeWhere((b) => b["boxId"] == widget.box["boxId"]);
-
-    await file.writeAsString(const JsonEncoder.withIndent('  ').convert(data));
+    await DatabaseManager.deleteBox(widget.box["boxId"]);
 
     if (!mounted) return;
     Navigator.pop(context, "deleted");
@@ -120,9 +93,7 @@ class _EditBoxPageState extends State<EditBoxPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Modifica Box"),
-        actions: const [
-          GlobalMenuButton(),
-        ],
+        actions: const [GlobalMenuButton()],
       ),
 
       body: SingleChildScrollView(
@@ -131,8 +102,10 @@ class _EditBoxPageState extends State<EditBoxPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 🔥 QR CODE
-            const Text("QR Code", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              "QR Code",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 6),
 
             Center(
@@ -155,14 +128,17 @@ class _EditBoxPageState extends State<EditBoxPage> {
 
             const SizedBox(height: 20),
 
-            // 🔥 DATA CREAZIONE
-            Text("Creata il: $createdAt",
-                style: const TextStyle(fontSize: 16, color: Colors.grey)),
+            Text(
+              "Creata il: $createdAt",
+              style: const TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+
             const SizedBox(height: 20),
 
-            // 🔥 TITOLO (NON modificabile)
-            const Text("Titolo (non modificabile)",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              "Titolo (non modificabile)",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 6),
 
             Container(
@@ -180,25 +156,25 @@ class _EditBoxPageState extends State<EditBoxPage> {
 
             const SizedBox(height: 20),
 
-            // 🔥 DESCRIZIONE
-            const Text("Descrizione",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              "Descrizione",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             const SizedBox(height: 6),
 
             TextField(
               controller: descrizioneController,
               maxLines: null,
               minLines: 3,
-              decoration: const InputDecoration(
-                border: OutlineInputBorder(),
-              ),
+              decoration: const InputDecoration(border: OutlineInputBorder()),
             ),
 
             const SizedBox(height: 20),
 
-            // 🔥 STATO
-            const Text("Stato della box",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text(
+              "Stato della box",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
             DropdownButton<String>(
               value: stato,
               items: [
@@ -212,7 +188,6 @@ class _EditBoxPageState extends State<EditBoxPage> {
 
             const SizedBox(height: 20),
 
-            // 🔥 IMMAGINI
             ElevatedButton.icon(
               onPressed: pickImages,
               icon: const Icon(Icons.photo_library),
@@ -248,14 +223,19 @@ class _EditBoxPageState extends State<EditBoxPage> {
                           top: 4,
                           right: 14,
                           child: GestureDetector(
-                            onTap: () => setState(() => immagini.removeAt(index)),
+                            onTap: () =>
+                                setState(() => immagini.removeAt(index)),
                             child: Container(
                               padding: const EdgeInsets.all(4),
                               decoration: const BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: Colors.black54,
                               ),
-                              child: const Icon(Icons.close, color: Colors.white, size: 16),
+                              child: const Icon(
+                                Icons.close,
+                                color: Colors.white,
+                                size: 16,
+                              ),
                             ),
                           ),
                         ),
@@ -267,7 +247,6 @@ class _EditBoxPageState extends State<EditBoxPage> {
 
             const SizedBox(height: 30),
 
-            // 🔥 SALVA
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -278,7 +257,6 @@ class _EditBoxPageState extends State<EditBoxPage> {
 
             const SizedBox(height: 20),
 
-            // 🔥 ELIMINA
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(

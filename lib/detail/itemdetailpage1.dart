@@ -2,65 +2,94 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'fullscreen_gallery.dart';
 import 'edit/edititempage.dart';
+import 'package:applicazione_psnat/detail/database_manager.dart';
 
-class ItemDetailPage extends StatelessWidget {
+class ItemDetailPage extends StatefulWidget {
   final Map<String, dynamic> item;
 
   const ItemDetailPage({super.key, required this.item});
 
-  // ⭐ LISTA DI TAG (materiale, condizioni, periodo)
-  Widget _tagField(String label, dynamic value) {
-  // Normalizzo il valore in una lista
-  List<dynamic> list;
-
-  if (value == null) {
-    list = [];
-  } else if (value is String) {
-    list = [value];
-  } else if (value is List) {
-    list = value;
-  } else {
-    list = [];
-  }
-
-  return Column(
-    crossAxisAlignment: CrossAxisAlignment.start,
-    children: [
-      Text(label, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-      const SizedBox(height: 6),
-
-      if (list.isNotEmpty)
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: list.map((v) {
-            return Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade100,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                v.toString(),
-                style: const TextStyle(fontSize: 16),
-              ),
-            );
-          }).toList(),
-        )
-      else
-        const Text("Nessun valore", style: TextStyle(fontSize: 16, color: Colors.grey)),
-    ],
-  );
+  @override
+  State<ItemDetailPage> createState() => _ItemDetailPageState();
 }
 
+class _ItemDetailPageState extends State<ItemDetailPage> {
+  late Map<String, dynamic> item;
+
+  @override
+  void initState() {
+    super.initState();
+    item = widget.item;
+    _reloadItem();
+  }
+
+  Future<void> _reloadItem() async {
+    await DatabaseManager.load();
+
+    final updated = DatabaseManager.items.firstWhere(
+      (i) => i["itemId"] == item["itemId"],
+      orElse: () => item,
+    );
+
+    setState(() {
+      item = Map<String, dynamic>.from(updated);
+    });
+  }
+
+  // ⭐ Normalizza qualsiasi valore in lista
+  Widget _tagField(String label, dynamic value) {
+    List<dynamic> list;
+
+    if (value == null) {
+      list = [];
+    } else if (value is String) {
+      list = [value];
+    } else if (value is List) {
+      list = value;
+    } else {
+      list = [];
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 6),
+
+        if (list.isNotEmpty)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: list.map((v) {
+              return Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade100,
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  v.toString(),
+                  style: const TextStyle(fontSize: 16),
+                ),
+              );
+            }).toList(),
+          )
+        else
+          const Text("Nessun valore",
+              style: TextStyle(fontSize: 16, color: Colors.grey)),
+      ],
+    );
+  }
 
   String _formatDate(DateTime? dt) {
     if (dt == null) return "N/D";
     return "${dt.day.toString().padLeft(2, '0')}/"
-           "${dt.month.toString().padLeft(2, '0')}/"
-           "${dt.year} "
-           "${dt.hour.toString().padLeft(2, '0')}:"
-           "${dt.minute.toString().padLeft(2, '0')}";
+        "${dt.month.toString().padLeft(2, '0')}/"
+        "${dt.year} "
+        "${dt.hour.toString().padLeft(2, '0')}:"
+        "${dt.minute.toString().padLeft(2, '0')}";
   }
 
   @override
@@ -98,7 +127,8 @@ class ItemDetailPage extends StatelessWidget {
               }
 
               if (result != null) {
-                Navigator.pop(context, result);
+                await _reloadItem();
+                Navigator.pop(context, item);
               }
             },
           ),
@@ -111,56 +141,41 @@ class ItemDetailPage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 🔥 NOME
-            const Text("Nome", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text("Nome",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
             _infoBox(item["nome"] ?? ""),
 
             const SizedBox(height: 24),
 
-            // 🔥 DESCRIZIONE
-            const Text("Descrizione", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const Text("Descrizione",
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
             _infoBox(item["descrizione"] ?? ""),
 
             const SizedBox(height: 24),
 
-            // 🔥 MATERIALI (LISTA)
             _tagField("Materiale", item["materiale"]),
-
             const SizedBox(height: 24),
 
-            // 🔥 STATO (SINGOLO)
             _tagField("Stato del reperto", item["stato"]),
-
             const SizedBox(height: 24),
 
-            // 🔥 CONDIZIONI (LISTA)
             _tagField("Condizioni", item["condizioni"]),
-
             const SizedBox(height: 24),
 
-            // 🔥 TIPOLOGIA (SINGOLO)
             _tagField("Tipologia", item["tipologia"]),
-
             const SizedBox(height: 24),
 
-            // 🔥 PERIODO (LISTA)
             _tagField("Periodo storico", item["periodo"]),
-
             const SizedBox(height: 24),
 
-            // 🔥 PROVENIENZA (SINGOLO)
             _tagField("Provenienza", item["provenienza"]),
-
             const SizedBox(height: 24),
 
-            // 🔥 TECNICA (SINGOLO)
             _tagField("Tecnica di produzione", item["tecnica"]),
-
             const SizedBox(height: 24),
 
-            // 🔥 DATE
             const Text("Informazioni cronologiche",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
@@ -172,7 +187,6 @@ class ItemDetailPage extends StatelessWidget {
 
             const SizedBox(height: 30),
 
-            // 🔥 IMMAGINI
             const Text("Immagini",
                 style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),

@@ -1,10 +1,8 @@
-import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:mobile_scanner/mobile_scanner.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:applicazione_psnat/detail/boxdetailpage.dart';
+import 'package:applicazione_psnat/detail/database_manager.dart';
 
 class ScanPage extends StatefulWidget {
   const ScanPage({super.key});
@@ -21,6 +19,7 @@ class _ScanPageState extends State<ScanPage> {
   void initState() {
     super.initState();
     _initCamera();
+    DatabaseManager.load(); // 🔥 assicura che il DB sia pronto
   }
 
   Future<void> _initCamera() async {
@@ -39,27 +38,16 @@ class _ScanPageState extends State<ScanPage> {
     if (mounted) setState(() {});
   }
 
-  Future<String> _localPath() async {
-    final directory = await getApplicationDocumentsDirectory();
-    return directory.path;
-  }
-
-  Future<File> _localFile() async {
-    final path = await _localPath();
-    return File('$path/database.json');
-  }
-
-  Future<Map<String, dynamic>?> _findBoxById(String id) async {
+  // 🔥 Cerca la box nel DatabaseManager
+  Map<String, dynamic>? _findBoxById(String id) {
     try {
-      final file = await _localFile();
-      final content = await file.readAsString();
-      final List<dynamic> data = jsonDecode(content);
-
-      for (var box in data) {
-        if (box["boxId"] == id) return box;
-      }
-    } catch (_) {}
-    return null;
+      return DatabaseManager.boxes.firstWhere(
+        (b) => b["boxId"] == id,
+        orElse: () => null,
+      );
+    } catch (_) {
+      return null;
+    }
   }
 
   void _onDetect(BarcodeCapture capture) async {
@@ -71,7 +59,7 @@ class _ScanPageState extends State<ScanPage> {
 
     isProcessing = true;
 
-    final box = await _findBoxById(rawValue);
+    final box = _findBoxById(rawValue);
 
     if (box == null) {
       isProcessing = false;
@@ -106,10 +94,10 @@ class _ScanPageState extends State<ScanPage> {
     return Scaffold(
       body: Stack(
         children: [
-          // 🔥 Anteprima fotocamera super fluida
+          // 🔥 Anteprima fotocamera
           CameraPreview(controller!),
 
-          // 🔥 Scanner QR (analizza solo alcuni frame → molto fluido)
+          // 🔥 Scanner QR
           MobileScanner(
             onDetect: _onDetect,
             fit: BoxFit.cover,

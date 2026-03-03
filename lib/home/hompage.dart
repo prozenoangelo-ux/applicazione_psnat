@@ -1,100 +1,101 @@
 import 'package:flutter/material.dart';
 import 'scanpage.dart';
-import 'newpage.dart';
 import 'searchpage.dart';
+import 'package:applicazione_psnat/home/newpage.dart';
 import 'package:applicazione_psnat/widgets/global_menu_button.dart';
-
-
 
 class CentralButtonsWidget extends StatelessWidget {
   const CentralButtonsWidget({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final w = constraints.maxWidth;
-        final h = constraints.maxHeight;
+    return Scaffold(
+      backgroundColor: Colors.white,
 
-        // 🔥 Riconoscimento tablet vs telefono
-        final bool isTablet = w > h; // schermo largo → tablet
+      // 🔥 GlobalMenuButton anche qui
+      appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        actions: const [
+          GlobalMenuButton(),
+        ],
+      ),
 
-        // 🔥 Numero colonne e righe
-        final int columns = isTablet ? 2 : 1;
-        final int rows = isTablet ? 2 : 3;
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final w = constraints.maxWidth;
+          final h = constraints.maxHeight;
 
-        // 🔥 Dimensioni proporzionali del contenitore
-        final containerWidth = w * 0.90;
-        final containerHeight = h * 0.90;
+          final bool isTablet = w > h;
+          final int columns = isTablet ? 2 : 1;
+          final int rows = isTablet ? 2 : 3;
 
-        final padding = w * 0.04;
-        final borderRadius = w * 0.06;
-        final borderWidth = w * 0.004;
+          final containerWidth = w * 0.90;
+          final containerHeight = h * 0.90;
 
-        // 🔥 Calcolo dimensione massima dei pulsanti
-        final double maxButtonWidth = (containerWidth - padding * 2) / columns;
-        final double maxButtonHeight = (containerHeight - padding * 2) / rows;
+          final padding = w * 0.04;
+          final borderRadius = w * 0.06;
+          final borderWidth = w * 0.004;
 
-        // 🔥 Pulsante quadrato che non sfora mai
-        final double buttonSize = maxButtonWidth < maxButtonHeight
-            ? maxButtonWidth
-            : maxButtonHeight;
+          final double maxButtonWidth = (containerWidth - padding * 2) / columns;
+          final double maxButtonHeight = (containerHeight - padding * 2) / rows;
 
-        return Center(
-          child: Container(
-            width: containerWidth,
-            height: containerHeight,
-            padding: EdgeInsets.all(padding),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade200,
-              borderRadius: BorderRadius.circular(borderRadius),
-              border: Border.all(color: Colors.grey.shade400, width: borderWidth),
-            ),
+          final double buttonSize =
+              maxButtonWidth < maxButtonHeight ? maxButtonWidth : maxButtonHeight;
 
-            child: GridView.count(
-              crossAxisCount: columns,
-              mainAxisSpacing: padding,
-              crossAxisSpacing: padding,
-              childAspectRatio: 1, // pulsanti quadrati
-              children: [
-                _buildButton(
-                  context,
-                  size: buttonSize,
-                  icon: Icons.qr_code_scanner,
-                  label: "Scansiona",
-                  page: const ScanPage(),
-                ),
-                _buildButton(
-                  context,
-                  size: buttonSize,
-                  icon: Icons.search,
-                  label: "Search",
-                  page: const Searchpage(),
-                ),
-                _buildButton(
-                  context,
-                  size: buttonSize,
-                  icon: Icons.add_box,
-                  label: "New QR",
-                  page: const NewBoxPage(),
-                ),
-
-                // 🔥 Quarto slot solo su tablet (2×2)
-                if (isTablet)
-                  Center(
-                    child: Text(
-                      "BoxApp",
-                      style: TextStyle(
-                        fontSize: buttonSize * 0.15,
-                        color: Colors.grey.shade600,
+          return Center(
+            child: Container(
+              width: containerWidth,
+              height: containerHeight,
+              padding: EdgeInsets.all(padding),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(borderRadius),
+                border: Border.all(color: Colors.grey.shade400, width: borderWidth),
+              ),
+              child: GridView.count(
+                crossAxisCount: columns,
+                mainAxisSpacing: padding,
+                crossAxisSpacing: padding,
+                childAspectRatio: 1,
+                children: [
+                  _buildButton(
+                    context,
+                    size: buttonSize,
+                    icon: Icons.qr_code_scanner,
+                    label: "Scansiona",
+                    page: const ScanPage(),
+                  ),
+                  _buildButton(
+                    context,
+                    size: buttonSize,
+                    icon: Icons.search,
+                    label: "Search",
+                    page: const Searchpage(),
+                  ),
+                  _buildButton(
+                    context,
+                    size: buttonSize,
+                    icon: Icons.add_box,
+                    label: "New Box",
+                    page: const NewBoxPage(),
+                  ),
+                  if (isTablet)
+                    Center(
+                      child: Text(
+                        "BoxApp",
+                        style: TextStyle(
+                          fontSize: buttonSize * 0.15,
+                          color: Colors.grey.shade600,
+                        ),
                       ),
                     ),
-                  ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -131,23 +132,6 @@ class CentralButtonsWidget extends StatelessWidget {
   }
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'BoxApp',
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color.fromARGB(255, 40, 94, 50),
-        ),
-      ),
-      home: const MyHomePage(title: 'BoxApp'),
-    );
-  }
-}
-
 class MyHomePage extends StatelessWidget {
   const MyHomePage({super.key, required this.title});
 
@@ -156,6 +140,8 @@ class MyHomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: Colors.white,
+
       appBar: AppBar(
         centerTitle: true,
         backgroundColor: Theme.of(context).colorScheme.secondary,
@@ -164,6 +150,7 @@ class MyHomePage extends StatelessWidget {
           GlobalMenuButton(),
         ],
       ),
+
       body: const CentralButtonsWidget(),
     );
   }

@@ -1,9 +1,8 @@
 import 'dart:io';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:applicazione_psnat/widgets/global_menu_button.dart';
+import 'package:applicazione_psnat/detail/database_manager.dart';
 
 class EditItemPage extends StatefulWidget {
   final Map<String, dynamic> item;
@@ -19,9 +18,9 @@ class _EditItemPageState extends State<EditItemPage> {
   late TextEditingController descrizioneController;
   late List<File> immagini;
 
-  // 🔥 Nuovi campi
   late DateTime createdAt;
   late DateTime updatedAt;
+
   List<String> selectedTags = [];
   String? stato;
 
@@ -61,16 +60,6 @@ class _EditItemPageState extends State<EditItemPage> {
     stato = widget.item["stato"] ?? statiReperto.first;
   }
 
-  Future<String> _localPath() async {
-    final directory = await getApplicationDocumentsDirectory();
-    return directory.path;
-  }
-
-  Future<File> _localFile() async {
-    final path = await _localPath();
-    return File('$path/database.json');
-  }
-
   Future<void> pickImages() async {
     final picker = ImagePicker();
     final List<XFile> files = await picker.pickMultiImage();
@@ -91,20 +80,7 @@ class _EditItemPageState extends State<EditItemPage> {
     widget.item["tags"] = selectedTags;
     widget.item["stato"] = stato;
 
-    final file = await _localFile();
-    final content = await file.readAsString();
-    List<dynamic> data = jsonDecode(content);
-
-    for (var box in data) {
-      final items = (box["items"] as List<dynamic>? ?? []);
-      final index = items.indexWhere((it) => it["itemId"] == widget.item["itemId"]);
-      if (index != -1) {
-        items[index] = widget.item;
-        break;
-      }
-    }
-
-    await file.writeAsString(const JsonEncoder.withIndent('  ').convert(data));
+    await DatabaseManager.updateItem(widget.item);
 
     if (!mounted) return;
     Navigator.pop(context, widget.item);
@@ -133,20 +109,7 @@ class _EditItemPageState extends State<EditItemPage> {
 
     if (confirm != true) return;
 
-    final file = await _localFile();
-    final content = await file.readAsString();
-    List<dynamic> data = jsonDecode(content);
-
-    for (var box in data) {
-      final items = (box["items"] as List<dynamic>? ?? []);
-      final index = items.indexWhere((it) => it["itemId"] == widget.item["itemId"]);
-      if (index != -1) {
-        items.removeAt(index);
-        break;
-      }
-    }
-
-    await file.writeAsString(const JsonEncoder.withIndent('  ').convert(data));
+    await DatabaseManager.deleteItem(widget.item["itemId"]);
 
     if (!mounted) return;
     Navigator.pop(context, "deleted");
@@ -157,9 +120,7 @@ class _EditItemPageState extends State<EditItemPage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text("Modifica Item"),
-        actions: const [
-          GlobalMenuButton(),
-        ],
+        actions: const [GlobalMenuButton()],
       ),
 
       body: SingleChildScrollView(
@@ -168,12 +129,10 @@ class _EditItemPageState extends State<EditItemPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 🔥 DATE
             Text("Creato il: ${createdAt.toLocal()}"),
             Text("Ultima modifica: ${updatedAt.toLocal()}"),
             const SizedBox(height: 20),
 
-            // 🔥 NOME
             const Text("Nome", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
             TextField(
@@ -183,7 +142,6 @@ class _EditItemPageState extends State<EditItemPage> {
 
             const SizedBox(height: 20),
 
-            // 🔥 DESCRIZIONE
             const Text("Descrizione", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
             TextField(
@@ -195,7 +153,6 @@ class _EditItemPageState extends State<EditItemPage> {
 
             const SizedBox(height: 20),
 
-            // 🔥 TAG
             const Text("Tag", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             Wrap(
               spacing: 8,
@@ -219,7 +176,6 @@ class _EditItemPageState extends State<EditItemPage> {
 
             const SizedBox(height: 20),
 
-            // 🔥 STATO
             const Text("Stato del reperto", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
             DropdownButton<String>(
               value: stato,
@@ -231,7 +187,6 @@ class _EditItemPageState extends State<EditItemPage> {
 
             const SizedBox(height: 20),
 
-            // 🔥 IMMAGINI
             ElevatedButton.icon(
               onPressed: pickImages,
               icon: const Icon(Icons.photo_library),
@@ -269,9 +224,9 @@ class _EditItemPageState extends State<EditItemPage> {
                             onTap: () => setState(() => immagini.removeAt(index)),
                             child: Container(
                               padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                //color: Colors.black.withOpacity(0.6),
+                              decoration: const BoxDecoration(
                                 shape: BoxShape.circle,
+                                color: Colors.black54,
                               ),
                               child: const Icon(Icons.close, color: Colors.white, size: 16),
                             ),
@@ -285,7 +240,6 @@ class _EditItemPageState extends State<EditItemPage> {
 
             const SizedBox(height: 30),
 
-            // 🔥 SALVA
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(
@@ -296,7 +250,6 @@ class _EditItemPageState extends State<EditItemPage> {
 
             const SizedBox(height: 20),
 
-            // 🔥 ELIMINA
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(

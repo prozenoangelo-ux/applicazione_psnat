@@ -1,10 +1,9 @@
 import 'dart:io';
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:applicazione_psnat/detail/boxdetailpage.dart';
 import 'package:applicazione_psnat/widgets/global_menu_button.dart';
+import 'package:applicazione_psnat/detail/database_manager.dart';
 
 class Searchpage extends StatefulWidget {
   const Searchpage({super.key});
@@ -14,13 +13,13 @@ class Searchpage extends StatefulWidget {
 }
 
 class _SearchpageState extends State<Searchpage> {
-  List<dynamic> boxes = [];
-  List<dynamic> filteredBoxes = [];
+  List<Map<String, dynamic>> boxes = [];
+  List<Map<String, dynamic>> filteredBoxes = [];
+
   final TextEditingController searchController = TextEditingController();
 
-  String sortMode = "inserimento"; // "inserimento" | "alfabetico"
+  String sortMode = "inserimento";
 
-  // 🔥 Nuovi filtri
   String? selectedTag;
   String? selectedStato;
 
@@ -43,39 +42,22 @@ class _SearchpageState extends State<Searchpage> {
     "Stoccato",
   ];
 
-  Future<String> _localPath() async {
-    final directory = await getApplicationDocumentsDirectory();
-    return directory.path;
-  }
-
-  Future<File> _localFile() async {
-    final path = await _localPath();
-    return File('$path/database.json');
-  }
-
-  Future<void> loadJson() async {
-    try {
-      final file = await _localFile();
-      final content = await file.readAsString();
-      final decoded = jsonDecode(content);
-
-      setState(() {
-        boxes = decoded;
-        filteredBoxes = decoded;
-        applyFilters();
-      });
-    } catch (e) {
-      setState(() {
-        boxes = [];
-        filteredBoxes = [];
-      });
-    }
-  }
-
   @override
   void initState() {
     super.initState();
-    loadJson();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    await DatabaseManager.load();
+
+    boxes = DatabaseManager.boxes
+        .map((b) => Map<String, dynamic>.from(b))
+        .toList();
+
+    filteredBoxes = List.from(boxes);
+
+    applyFilters();
   }
 
   void applyFilters() {
@@ -89,33 +71,21 @@ class _SearchpageState extends State<Searchpage> {
       final matchSearch =
           titolo.contains(q) || descrizione.contains(q) || id.contains(q);
 
-      // 🔥 Filtra per TAG (se selezionato)
+      final items = DatabaseManager.items
+          .where((i) => i["boxId"] == box["boxId"])
+          .toList();
+
       bool matchTag = true;
       if (selectedTag != null) {
-        matchTag = false;
-
-        final items = (box["items"] as List<dynamic>? ?? []);
-        for (var item in items) {
+        matchTag = items.any((item) {
           final tags = (item["tags"] as List<dynamic>? ?? []).cast<String>();
-          if (tags.contains(selectedTag)) {
-            matchTag = true;
-            break;
-          }
-        }
+          return tags.contains(selectedTag);
+        });
       }
 
-      // 🔥 Filtra per STATO (se selezionato)
       bool matchStato = true;
       if (selectedStato != null) {
-        matchStato = false;
-
-        final items = (box["items"] as List<dynamic>? ?? []);
-        for (var item in items) {
-          if (item["stato"] == selectedStato) {
-            matchStato = true;
-            break;
-          }
-        }
+        matchStato = items.any((item) => item["stato"] == selectedStato);
       }
 
       return matchSearch && matchTag && matchStato;
@@ -128,8 +98,8 @@ class _SearchpageState extends State<Searchpage> {
     if (sortMode == "alfabetico") {
       filteredBoxes.sort(
         (a, b) => (a["titolo"] ?? "").toString().compareTo(
-          (b["titolo"] ?? "").toString(),
-        ),
+              (b["titolo"] ?? "").toString(),
+            ),
       );
     }
   }
@@ -144,7 +114,6 @@ class _SearchpageState extends State<Searchpage> {
 
       body: Column(
         children: [
-          // 🔍 BARRA DI RICERCA + ORDINAMENTO
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
@@ -172,7 +141,10 @@ class _SearchpageState extends State<Searchpage> {
                       value: "inserimento",
                       child: Text("Inserimento"),
                     ),
-                    DropdownMenuItem(value: "alfabetico", child: Text("A → Z")),
+                    DropdownMenuItem(
+                      value: "alfabetico",
+                      child: Text("A → Z"),
+                    ),
                   ],
                   onChanged: (value) {
                     sortMode = value!;
@@ -183,12 +155,10 @@ class _SearchpageState extends State<Searchpage> {
             ),
           ),
 
-          // 🔥 FILTRI TAG + STATO
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                // TAG
                 Expanded(
                   child: DropdownButton<String>(
                     isExpanded: true,
@@ -212,7 +182,6 @@ class _SearchpageState extends State<Searchpage> {
 
                 const SizedBox(width: 12),
 
-                // STATO
                 Expanded(
                   child: DropdownButton<String>(
                     isExpanded: true,
@@ -239,7 +208,6 @@ class _SearchpageState extends State<Searchpage> {
 
           const SizedBox(height: 10),
 
-          // LISTA RISULTATI
           Expanded(
             child: filteredBoxes.isEmpty
                 ? const Center(
@@ -264,8 +232,7 @@ class _SearchpageState extends State<Searchpage> {
                           );
 
                           if (result == "deleted") {
-                            await loadJson();
-                            setState(() {});
+                            await _loadData();
                           }
                         },
 
@@ -287,12 +254,10 @@ class _SearchpageState extends State<Searchpage> {
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // 🔥 ANTEPRIMA: foto del primo item, oppure QR
                               _buildPreview(box),
 
                               const SizedBox(width: 16),
 
-                              // 🔥 TESTO
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -339,7 +304,9 @@ class _SearchpageState extends State<Searchpage> {
   }
 
   Widget _buildPreview(Map<String, dynamic> box) {
-    final items = (box["items"] as List<dynamic>? ?? []);
+    final items = DatabaseManager.items
+        .where((i) => i["boxId"] == box["boxId"])
+        .toList();
 
     if (items.isNotEmpty) {
       final firstItem = items.first;
@@ -363,50 +330,6 @@ class _SearchpageState extends State<Searchpage> {
       }
     }
 
-    Widget _buildPreview(Map<String, dynamic> box) {
-      final items = (box["items"] as List<dynamic>? ?? []);
-
-      if (items.isNotEmpty) {
-        final firstItem = items.first;
-        final foto = (firstItem["foto"] as List<dynamic>? ?? []);
-
-        if (foto.isNotEmpty) {
-          final path = foto.first;
-
-          return Container(
-            width: 60,
-            height: 60,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(12),
-              color: Colors.grey.shade200,
-              image: DecorationImage(
-                image: FileImage(File(path)),
-                fit: BoxFit.cover,
-              ),
-            ),
-          );
-        }
-      }
-
-      return Container(
-        width: 60,
-        height: 60,
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          color: Colors.white,
-          border: Border.all(color: Colors.grey.shade300),
-        ),
-        child: QrImageView(
-          data: box["boxId"] ?? "",
-          version: QrVersions.auto,
-          backgroundColor: Colors.white,
-        ),
-      );
-    }
-
-    _buildPreview(box);
-    // 🔥 Altrimenti mostra il QR della box
     return Container(
       width: 60,
       height: 60,

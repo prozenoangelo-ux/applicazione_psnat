@@ -1,14 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
-import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart' show rootBundle;
 
 class UserManager {
   static Map<String, dynamic> _data = {};
   static bool _loaded = false;
 
-  // 🔥 Carica users.json
+  // 🔥 Carica users.json (con riparazione automatica)
   static Future<void> load() async {
     if (_loaded) return;
 
@@ -22,29 +21,46 @@ class UserManager {
     }
 
     final content = await file.readAsString();
-    _data = jsonDecode(content);
+
+    try {
+      _data = jsonDecode(content);
+    } catch (e) {
+      // Se il file è corrotto, lo resetta
+      _data = {
+        "users": [],
+        "currentUser": null,
+      };
+      await _save();
+    }
+
+    // 🔥 Se manca la lista utenti, la crea
+    _data["users"] ??= [];
+
+    // 🔥 Se manca currentUser, lo crea
+    _data["currentUser"] ??= null;
+
     _loaded = true;
   }
 
+  // 🔍 Restituisce il file locale
+  static Future<File> getLocalUserFile() async {
+    final dir = await getApplicationDocumentsDirectory();
+    return File("${dir.path}/users.json");
+  }
+
+  // 💾 Salva il file JSON
   static Future<void> _save() async {
     final dir = await getApplicationDocumentsDirectory();
     final file = File("${dir.path}/users.json");
     await file.writeAsString(const JsonEncoder.withIndent("  ").convert(_data));
   }
 
-  // 🔐 Hash password
-  static String hashPassword(String password) {
-    return sha256.convert(utf8.encode(password)).toString();
-  }
-
-  // 🔑 Login
+  // 🔑 Login (password in chiaro)
   static Future<Map<String, dynamic>?> login(String username, String password) async {
     await load();
 
-    final hash = hashPassword(password);
-
     for (var user in _data["users"]) {
-      if (user["username"] == username && user["passwordHash"] == hash) {
+      if (user["username"] == username && user["password"] == password) {
         _data["currentUser"] = user;
         await _save();
         return user;
@@ -53,7 +69,7 @@ class UserManager {
     return null;
   }
 
-  // 🆕 Registrazione
+  // 🆕 Registrazione (password in chiaro)
   static Future<bool> register(String username, String password) async {
     await load();
 
@@ -65,7 +81,7 @@ class UserManager {
     final newUser = {
       "userId": DateTime.now().millisecondsSinceEpoch.toString(),
       "username": username,
-      "passwordHash": hashPassword(password),
+      "password": password,
       "role": "user",
       "permissions": []
     };
@@ -96,16 +112,30 @@ class UserManager {
 
   // 👑 Aggiungi permesso
   static Future<void> addPermission(String userId, String siteId) async {
-    await load();
+  await load();
 
-    for (var user in _data["users"]) {
-      if (user["userId"] == userId) {
-        if (!user["permissions"].contains(siteId)) {
-          user["permissions"].add(siteId);
-        }
+  for (var user in _data["users"]) {
+    if (user["userId"] == userId) {
+      user["permissions"] ??= [];
+      if (!user["permissions"].contains(siteId)) {
+        user["permissions"].add(siteId);
       }
     }
-
-    await _save();
   }
+
+  await _save();
+}
+static Future<void> removePermission(String userId, String siteId) async {
+  await load();
+
+  for (var user in _data["users"]) {
+    if (user["userId"] == userId) {
+      user["permissions"]?.remove(siteId);
+    }
+  }
+
+  await _save();
+}
+
+
 }

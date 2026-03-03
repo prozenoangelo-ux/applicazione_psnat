@@ -1,12 +1,11 @@
 import 'dart:io';
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:applicazione_psnat/widgets/global_menu_button.dart';
 import 'package:applicazione_psnat/widgets/multitagselector.dart';
 import 'package:applicazione_psnat/widgets/tagselector.dart';
 import 'package:applicazione_psnat/detail/edit/newsite.dart';
+import 'package:applicazione_psnat/detail/database_manager.dart';
 
 class NewItemPage extends StatefulWidget {
   final Map<String, dynamic> box;
@@ -15,38 +14,6 @@ class NewItemPage extends StatefulWidget {
 
   @override
   State<NewItemPage> createState() => _NewItemPageState();
-}
-
-// 🔵 DROPDOWN SITI
-class SearchableDropdown extends StatelessWidget {
-  final List<Map<String, dynamic>> items;
-  final String? selectedId;
-  final Function(String?) onChanged;
-
-  const SearchableDropdown({
-    super.key,
-    required this.items,
-    required this.selectedId,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return DropdownButtonFormField<String>(
-      initialValue: selectedId,
-      decoration: const InputDecoration(
-        border: OutlineInputBorder(),
-        labelText: "Sito archeologico",
-      ),
-      items: items.map((site) {
-        return DropdownMenuItem<String>(
-          value: site["siteId"] as String,
-          child: Text(site["nome"] as String),
-        );
-      }).toList(),
-      onChanged: onChanged,
-    );
-  }
 }
 
 class _NewItemPageState extends State<NewItemPage> {
@@ -111,30 +78,14 @@ class _NewItemPageState extends State<NewItemPage> {
   void initState() {
     super.initState();
     stato = statiReperto.first;
-    _loadSites(); // 🔥 carica i siti
+    _loadSites();
   }
 
-  Future<String> _localPath() async {
-    final directory = await getApplicationDocumentsDirectory();
-    return directory.path;
-  }
-
-  Future<File> _localFile() async {
-    final path = await _localPath();
-    return File('$path/database.json');
-  }
-
-  // 🔵 CARICA I SITI DAL DATABASE
   Future<void> _loadSites() async {
-    final file = await _localFile();
-    final content = await file.readAsString();
-    List<dynamic> data = jsonDecode(content);
-
-    Map<String, dynamic> root = data.first;
-    sites = (root["sites"] as List<dynamic>? ?? [])
+    await DatabaseManager.load();
+    sites = DatabaseManager.sites
         .map((e) => Map<String, dynamic>.from(e))
         .toList();
-
     setState(() {});
   }
 
@@ -163,6 +114,7 @@ class _NewItemPageState extends State<NewItemPage> {
 
     final newItem = {
       "itemId": DateTime.now().millisecondsSinceEpoch.toString(),
+      "boxId": widget.box["boxId"], // 🔥 collegamento alla box
       "nome": nome,
       "descrizione": descrizione,
       "foto": immagini.map((f) => f.path).toList(),
@@ -177,25 +129,14 @@ class _NewItemPageState extends State<NewItemPage> {
       "provenienza": provenienza,
       "tecnica": tecnica,
 
-      "siteId": selectedSiteId, // 🔥 SALVATO
+      "siteId": selectedSiteId,
     };
 
-    widget.box["items"] ??= [];
-    widget.box["items"].add(newItem);
-
-    final file = await _localFile();
-    final content = await file.readAsString();
-    List<dynamic> data = jsonDecode(content);
-
-    final index = data.indexWhere((b) => b["boxId"] == widget.box["boxId"]);
-    if (index != -1) {
-      data[index] = widget.box;
-    }
-
-    await file.writeAsString(const JsonEncoder.withIndent('  ').convert(data));
+    // 🔥 Salva nel database
+    await DatabaseManager.addItem(newItem);
 
     if (!mounted) return;
-    Navigator.pop(context, widget.box);
+    Navigator.pop(context, newItem);
   }
 
   @override
@@ -244,9 +185,18 @@ class _NewItemPageState extends State<NewItemPage> {
             const SizedBox(height: 20),
 
             // 🔵 DROPDOWN SITI
-            SearchableDropdown(
-              items: sites,
-              selectedId: selectedSiteId,
+            DropdownButtonFormField<String>(
+              initialValue: selectedSiteId,
+              decoration: const InputDecoration(
+                border: OutlineInputBorder(),
+                labelText: "Sito archeologico",
+              ),
+              items: sites.map((site) {
+                return DropdownMenuItem<String>(
+                  value: site["siteId"],
+                  child: Text(site["nome"]),
+                );
+              }).toList(),
               onChanged: (v) => setState(() => selectedSiteId = v),
             ),
 
@@ -339,19 +289,14 @@ class _NewItemPageState extends State<NewItemPage> {
                           top: 4,
                           right: 14,
                           child: GestureDetector(
-                            onTap: () =>
-                                setState(() => immagini.removeAt(index)),
+                            onTap: () => setState(() => immagini.removeAt(index)),
                             child: Container(
                               padding: const EdgeInsets.all(4),
                               decoration: const BoxDecoration(
                                 shape: BoxShape.circle,
                                 color: Colors.black54,
                               ),
-                              child: const Icon(
-                                Icons.close,
-                                color: Colors.white,
-                                size: 16,
-                              ),
+                              child: const Icon(Icons.close, color: Colors.white, size: 16),
                             ),
                           ),
                         ),

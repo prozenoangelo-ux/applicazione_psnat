@@ -1,11 +1,12 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:qr_flutter/qr_flutter.dart';
+import 'package:applicazione_psnat/widgets/global_menu_button.dart';
+import 'package:applicazione_psnat/widgets/qrsavers.dart';
+import 'package:applicazione_psnat/detail/database_manager.dart';
 import 'edit/newitempage.dart';
 import 'itemdetailpage1.dart';
-import 'package:applicazione_psnat/widgets/global_menu_button.dart';
 import 'package:applicazione_psnat/detail/edit/editboxpage.dart';
-import 'package:qr_flutter/qr_flutter.dart';
-import 'package:applicazione_psnat/widgets/qrsavers.dart';
 
 class DetailBoxPage extends StatefulWidget {
   final Map<String, dynamic> box;
@@ -21,44 +22,27 @@ class _DetailBoxPageState extends State<DetailBoxPage> {
 
   final GlobalKey qrKey = GlobalKey();
 
-  // 🔥 Normalizza qualsiasi valore in una lista di stringhe
-  List<String> _normalize(dynamic value) {
-    if (value == null) return [];
-    if (value is String) return [value];
-    if (value is List) return value.map((e) => e.toString()).toList();
-    return [];
-  }
-
-  // 🔥 Chip stile ItemDetailPage
-  Widget _tagChip(String value) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.blue.shade100,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Text(value, style: const TextStyle(fontSize: 16)),
-    );
-  }
-
-  // 🔥 Lista di chip
-  Widget _tagListBox(List<String> tags) {
-    if (tags.isEmpty) {
-      return const Text("Nessun tag",
-          style: TextStyle(fontSize: 16, color: Colors.grey));
-    }
-
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
-      children: tags.map((t) => _tagChip(t)).toList(),
-    );
-  }
-
   @override
   void initState() {
     super.initState();
     box = widget.box;
+    _reloadBox();
+  }
+
+  Future<void> _reloadBox() async {
+    await DatabaseManager.load();
+    final updated = DatabaseManager.boxes.firstWhere(
+      (b) => b["boxId"] == box["boxId"],
+      orElse: () => box,
+    );
+    setState(() => box = Map<String, dynamic>.from(updated));
+  }
+
+  List<Map<String, dynamic>> _getItemsForBox() {
+    return DatabaseManager.items
+        .where((i) => i["boxId"] == box["boxId"])
+        .map((e) => Map<String, dynamic>.from(e))
+        .toList();
   }
 
   String _formatDate(String? iso) {
@@ -73,41 +57,9 @@ class _DetailBoxPageState extends State<DetailBoxPage> {
         "${dt.minute.toString().padLeft(2, '0')}";
   }
 
-  // 🔥 Raccoglie TUTTI i tag reali degli item
-  List<String> _collectTags() {
-    final items = (box["items"] as List<dynamic>? ?? []);
-    final Set<String> tags = {};
-
-    for (var it in items) {
-      tags.addAll(_normalize(it["materiale"]));
-      tags.addAll(_normalize(it["condizioni"]));
-      tags.addAll(_normalize(it["periodo"]));
-
-      if (it["stato"] != null) tags.add(it["stato"].toString());
-      if (it["tipologia"] != null) tags.add(it["tipologia"].toString());
-      if (it["provenienza"] != null) tags.add(it["provenienza"].toString());
-      if (it["tecnica"] != null) tags.add(it["tecnica"].toString());
-    }
-
-    return tags.toList();
-  }
-
-  List<String> _collectStates() {
-    final items = (box["items"] as List<dynamic>? ?? []);
-    final Set<String> stati = {};
-
-    for (var it in items) {
-      if (it["stato"] != null) stati.add(it["stato"]);
-    }
-
-    return stati.toList();
-  }
-
   @override
   Widget build(BuildContext context) {
-    final List<dynamic> items = (box["items"] as List<dynamic>? ?? []);
-    final tags = _collectTags();
-    final stati = _collectStates();
+    final items = _getItemsForBox();
 
     final createdAt = _formatDate(box["createdAt"]);
     final updatedAt = _formatDate(box["updatedAt"]);
@@ -130,9 +82,7 @@ class _DetailBoxPageState extends State<DetailBoxPage> {
               }
 
               if (result != null) {
-                setState(() {
-                  box = result;
-                });
+                await _reloadBox();
               }
             },
           ),
@@ -142,15 +92,14 @@ class _DetailBoxPageState extends State<DetailBoxPage> {
 
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
-          final updatedBox = await Navigator.push(
+          final newItem = await Navigator.push(
             context,
             MaterialPageRoute(builder: (_) => NewItemPage(box: box)),
           );
 
-          if (updatedBox != null) {
-            setState(() {
-              box = updatedBox;
-            });
+          if (newItem != null) {
+            await _reloadBox();
+            setState(() {});
           }
         },
         child: const Icon(Icons.add),
@@ -162,7 +111,6 @@ class _DetailBoxPageState extends State<DetailBoxPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // QR
             Center(
               child: GestureDetector(
                 onTap: () => saveQrToGallery(qrKey, box["boxId"], context),
@@ -212,20 +160,6 @@ class _DetailBoxPageState extends State<DetailBoxPage> {
               "Ultima modifica: $updatedAt",
             ),
 
-            const SizedBox(height: 24),
-
-            const Text("Tag presenti",
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 6),
-            _tagListBox(tags),
-
-            const SizedBox(height: 24),
-
-            _infoBox(
-              "Numero di item: ${items.length}\n"
-              "Stati presenti: ${stati.isEmpty ? "Nessuno" : stati.join(", ")}",
-            ),
-
             const SizedBox(height: 30),
 
             const Text("Items nella Box",
@@ -248,21 +182,15 @@ class _DetailBoxPageState extends State<DetailBoxPage> {
                       );
 
                       if (result == "deleted") {
-                        setState(() {
-                          box["items"].removeWhere(
-                              (x) => x["itemId"] == it["itemId"]);
-                        });
+                        await DatabaseManager.deleteItem(it["itemId"]);
+                        await _reloadBox();
+                        setState(() {});
                         return;
                       }
 
                       if (result != null) {
-                        setState(() {
-                          final index = box["items"].indexWhere(
-                              (x) => x["itemId"] == result["itemId"]);
-                          if (index != -1) {
-                            box["items"][index] = result;
-                          }
-                        });
+                        await _reloadBox();
+                        setState(() {});
                       }
                     },
 
@@ -315,7 +243,6 @@ class _DetailBoxPageState extends State<DetailBoxPage> {
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
                                     style: const TextStyle(fontSize: 14)),
-                                const SizedBox(height: 6),
                               ],
                             ),
                           ),

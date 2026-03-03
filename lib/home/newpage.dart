@@ -1,10 +1,9 @@
-import 'dart:io';
-import 'dart:convert';
+
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:applicazione_psnat/widgets/global_menu_button.dart';
 import 'package:applicazione_psnat/widgets/qrsavers.dart';
+import 'package:applicazione_psnat/detail/database_manager.dart';
 
 final GlobalKey qrKey = GlobalKey();
 
@@ -22,7 +21,6 @@ class _NewBoxPageState extends State<NewBoxPage> {
   DateTime createdAt = DateTime.now();
   String? stato;
 
-  // 🔥 ID dinamico basato sul titolo
   String boxId = "";
 
   final List<String> statiBox = [
@@ -38,7 +36,6 @@ class _NewBoxPageState extends State<NewBoxPage> {
     stato = statiBox.first;
   }
 
-  // 🔥 Genera ID basato sul titolo
   void _updateBoxId() {
     final titolo = titoloController.text.trim().toLowerCase();
 
@@ -48,19 +45,8 @@ class _NewBoxPageState extends State<NewBoxPage> {
     }
 
     final safeTitle = titolo.replaceAll(RegExp(r'[^a-z0-9]+'), '_');
-
     boxId = "${safeTitle}_${DateTime.now().millisecondsSinceEpoch}";
     setState(() {});
-  }
-
-  Future<String> _localPath() async {
-    final directory = await getApplicationDocumentsDirectory();
-    return directory.path;
-  }
-
-  Future<File> _localFile() async {
-    final path = await _localPath();
-    return File('$path/database.json');
   }
 
   Future<void> saveBox() async {
@@ -85,24 +71,13 @@ class _NewBoxPageState extends State<NewBoxPage> {
       "boxId": boxId,
       "titolo": titolo,
       "descrizione": descrizione,
-      "foto": [], // 🔥 immagini rimosse
+      "foto": [],
       "createdAt": createdAt.toIso8601String(),
       "updatedAt": createdAt.toIso8601String(),
       "stato": stato,
-      "items": [],
     };
 
-    final file = await _localFile();
-    List<dynamic> data = [];
-
-    if (await file.exists()) {
-      final content = await file.readAsString();
-      data = jsonDecode(content);
-    }
-
-    data.add(newBox);
-
-    await file.writeAsString(const JsonEncoder.withIndent('  ').convert(data));
+    await DatabaseManager.addBox(newBox);
 
     if (!mounted) return;
     Navigator.pop(context, newBox);
@@ -125,12 +100,6 @@ class _NewBoxPageState extends State<NewBoxPage> {
             Text("Data creazione: $createdAt"),
             const SizedBox(height: 20),
 
-            // 🔥 QR CODE DINAMICO
-            // const Text(
-            //   "QR Code",
-            //   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            // ),
-            // const SizedBox(height: 6),
             Center(
               child: GestureDetector(
                 onTap: () => saveQrToGallery(qrKey, boxId, context),
@@ -159,7 +128,6 @@ class _NewBoxPageState extends State<NewBoxPage> {
 
             const SizedBox(height: 10),
 
-            // 🔥 Mostra ID sotto il QR
             if (boxId.isNotEmpty)
               Center(
                 child: Text(
