@@ -13,11 +13,15 @@ class DatabaseManager {
 
     // Se non esiste → crea struttura iniziale
     if (!file.existsSync()) {
-      await file.writeAsString(jsonEncode({
-        "sites": [],
-        "boxes": [],
-        "items": []
-      }));
+      await file.writeAsString(
+        jsonEncode({
+          "version": 1,
+          "lastSync": "",
+          "sites": [],
+          "boxes": [],
+          "items": []
+        }),
+      );
     }
 
     return file;
@@ -44,6 +48,8 @@ class DatabaseManager {
       _db = Map<String, dynamic>.from(raw.first);
     } else {
       _db = {
+        "version": 1,
+        "lastSync": "",
         "sites": [],
         "boxes": [],
         "items": []
@@ -51,6 +57,8 @@ class DatabaseManager {
     }
 
     // 🔥 Garantisce che le sezioni esistano
+    _db["version"] ??= 1;
+    _db["lastSync"] ??= "";
     _db["sites"] ??= [];
     _db["boxes"] ??= [];
     _db["items"] ??= [];
@@ -66,10 +74,27 @@ class DatabaseManager {
     );
   }
 
-  // 📌 GETTERS
+  // 📌 GETTERS pubblici
+  static Map<String, dynamic> get db => _db;
+  static int get localVersion => _db["version"] ?? 1;
+  static String get lastSync => _db["lastSync"] ?? "";
+
   static List<dynamic> get sites => _db["sites"];
   static List<dynamic> get boxes => _db["boxes"];
   static List<dynamic> get items => _db["items"];
+
+  // 🔥 Sostituisce l'intero database (usato dalla SyncPage)
+  static Future<void> replaceDatabase(Map<String, dynamic> newDb) async {
+    _db = {
+      "version": newDb["version"] ?? 1,
+      "lastSync": newDb["lastSync"] ?? "",
+      "sites": newDb["sites"] ?? [],
+      "boxes": newDb["boxes"] ?? [],
+      "items": newDb["items"] ?? [],
+    };
+
+    await save();
+  }
 
   // 📌 Aggiungi sito
   static Future<void> addSite(Map<String, dynamic> site) async {

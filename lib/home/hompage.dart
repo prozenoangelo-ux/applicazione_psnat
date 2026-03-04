@@ -3,6 +3,7 @@ import 'scanpage.dart';
 import 'searchpage.dart';
 import 'package:applicazione_psnat/home/newpage.dart';
 import 'package:applicazione_psnat/widgets/global_menu_button.dart';
+import 'package:applicazione_psnat/home/syncpage.dart';
 
 class CentralButtonsWidget extends StatelessWidget {
   const CentralButtonsWidget({super.key});
@@ -12,7 +13,7 @@ class CentralButtonsWidget extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.white,
 
-      // 🔥 GlobalMenuButton anche qui
+      //  GlobalMenuButton anche qui
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
@@ -80,6 +81,15 @@ class CentralButtonsWidget extends StatelessWidget {
                     label: "New Box",
                     page: const NewBoxPage(),
                   ),
+                  _buildButton(
+                    context,
+                    size: buttonSize,
+                    icon: Icons.sync,
+                    label: "Sync Page",
+                    page: const SyncPage(),
+                  ),
+
+
                   if (isTablet)
                     Center(
                       child: Text(

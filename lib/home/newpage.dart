@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'package:applicazione_psnat/widgets/global_menu_button.dart';
@@ -101,43 +100,38 @@ class _NewBoxPageState extends State<NewBoxPage> {
             const SizedBox(height: 20),
 
             Center(
-              child: GestureDetector(
-                onTap: () => saveQrToGallery(qrKey, boxId, context),
-                child: RepaintBoundary(
-                  key: qrKey,
-                  child: QrImageView(
-                    data: boxId,
-                    version: QrVersions.auto,
-                    size: 180,
-                    backgroundColor: Colors.white,
-                  ),
-                ),
-              ),
-            ),
-
-            Center(
               child: boxId.isEmpty
-                  ? const Text("Inserisci un titolo per generare il QR")
-                  : QrImageView(
-                      data: boxId,
-                      version: QrVersions.auto,
-                      size: 160,
-                      backgroundColor: Colors.white,
+                  ? const SizedBox() // Nessun QR se non c’è titolo
+                  : Column(
+                      children: [
+                        GestureDetector(
+                          onTap: () => saveQrToGallery(qrKey, boxId, context),
+                          child: RepaintBoundary(
+                            key: qrKey,
+                            child: QrImageView(
+                              data: boxId,
+                              version: QrVersions.auto,
+                              size: 180,
+                              backgroundColor: Colors.white,
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 10),
+
+                        Text(
+                          "ID: $boxId",
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
                     ),
             ),
 
             const SizedBox(height: 10),
-
-            if (boxId.isNotEmpty)
-              Center(
-                child: Text(
-                  "ID: $boxId",
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontSize: 14, color: Colors.grey),
-                ),
-              ),
-
-            const SizedBox(height: 24),
 
             const Text(
               "Titolo",
